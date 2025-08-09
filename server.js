@@ -1,10 +1,20 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
+const NodeCache = require('node-cache');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const cache = new NodeCache({ stdTTL: 120 }); // cache 120 giây = 2 phút
+
 app.get('/keo', async (req, res) => {
+  const cacheKey = 'goaloo_keo';
+
+  const cachedData = cache.get(cacheKey);
+  if (cachedData) {
+    return res.json(cachedData);
+  }
+
   const url = 'https://www.goaloo23.com/1x2AsianOdds/AsianOdds.aspx';
 
   try {
@@ -17,10 +27,8 @@ app.get('/keo', async (req, res) => {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36');
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
 
-    // Chờ phần bảng kèo load xong
     await page.waitForSelector('table#DataGrid2', { timeout: 10000 });
 
-    // Lấy dữ liệu
     const matches = await page.evaluate(() => {
       const rows = Array.from(document.querySelectorAll('table#DataGrid2 tr'));
       let results = [];
@@ -41,6 +49,8 @@ app.get('/keo', async (req, res) => {
     });
 
     await browser.close();
+
+    cache.set(cacheKey, matches);
 
     res.json(matches);
 
